@@ -1,17 +1,28 @@
 # coding:utf-8
-def loadDataSet():
-    dataSet = [['bread', 'milk', 'vegetable', 'fruit', 'eggs'],
-               ['noodle', 'beef', 'pork', 'water', 'socks', 'gloves', 'shoes', 'rice'],
-               ['socks', 'gloves'],
-               ['bread', 'milk', 'shoes', 'socks', 'eggs'],
-               ['socks', 'shoes', 'sweater', 'cap', 'milk', 'vegetable', 'gloves'],
-               ['eggs', 'bread', 'milk', 'fish', 'crab', 'shrimp', 'rice']]
-    return dataSet
+import json
+import pandas as pd
+
+def loadDataSet(df):
+    # df = pd.read_csv("C:/Users/DELL/Desktop/xin.csv",usecols=[0,1,2,3])
+    # numset = len()
+    matrix = df.values
+    headers = df.columns
+    m,n = df.shape
+    data_set = []
+    for i in range(m):
+        l = []
+        for j in range(n):
+            l.append(headers[j]+'='+str(matrix[i][j]))
+        data_set.append(l)
+    return m,data_set
 
 def transfer2FrozenDataSet(dataSet):
     frozenDataSet = {}
     for elem in dataSet:
-        frozenDataSet[frozenset(elem)] = 1
+        if frozenset(elem) not in frozenDataSet.keys():
+            frozenDataSet[frozenset(elem)] = 1
+        else:
+            frozenDataSet[frozenset(elem)] += 1
     return frozenDataSet
 
 class TreeNode:
@@ -25,20 +36,19 @@ class TreeNode:
     def increaseC(self, count):
         self.count += count
 
-def createFPTree(frozenDataSet, minSupport, sumset):
-    #scan dataset at the first time, filter out items which are less than minSupport
+def createFPTree(frozenDataSet, minSupport,numset):
     headPointTable = {}
     for items in frozenDataSet:
         for item in items:
             headPointTable[item] = headPointTable.get(item, 0) + frozenDataSet[items]
-    headPointTable = {k:v for k,v in headPointTable.items() if float(v) / float(sumset) >= minSupport}
+
+    headPointTable = {k:v for k,v in headPointTable.items() if float(v)/float(numset) >= minSupport}
     frequentItems = set(headPointTable.keys())
     if len(frequentItems) == 0: return None, None
 
     for k in headPointTable:
         headPointTable[k] = [headPointTable[k], None]
     fptree = TreeNode("null", 1, None)
-    #scan dataset at the second time, filter out items for each record
     for items,count in frozenDataSet.items():
         frequentItemsInRecord = {}
         for item in items:
@@ -51,7 +61,6 @@ def createFPTree(frozenDataSet, minSupport, sumset):
     return fptree, headPointTable
 
 def updateFPTree(fptree, orderedFrequentItems, headPointTable, count):
-    #handle the first item
     if orderedFrequentItems[0] in fptree.children:
         fptree.children[orderedFrequentItems[0]].increaseC(count)
     else:
@@ -71,22 +80,22 @@ def updateHeadPointTable(headPointBeginNode, targetNode):
         headPointBeginNode = headPointBeginNode.nextSimilarItem
     headPointBeginNode.nextSimilarItem = targetNode
 
-def mineFPTree(headPointTable, prefix, frequentPatterns, minSupport,sumset):
-    #for each item in headPointTable, find conditional prefix path, create conditional fptree, then iterate until there is only one element in conditional fptree
+def mineFPTree(headPointTable, prefix, frequentPatterns, minSupport,numset):
+    if headPointTable == None: return
     headPointItems = [v[0] for v in sorted(headPointTable.items(), key = lambda v:v[1][0])]
-    if(len(headPointItems) == 0): return    
+    if(len(headPointItems) == 0): return
+
     for headPointItem in headPointItems:
         newPrefix = prefix.copy()
         newPrefix.add(headPointItem)
         support = headPointTable[headPointItem][0]
-        # print float(support) / float(numset)       
         frequentPatterns[frozenset(newPrefix)] = support
 
         prefixPath = getPrefixPath(headPointTable, headPointItem)
         if(prefixPath != {}):
-            conditionalFPtree, conditionalHeadPointTable = createFPTree(prefixPath, minSupport, sumset)
+            conditionalFPtree, conditionalHeadPointTable = createFPTree(prefixPath, minSupport, numset)
             if conditionalHeadPointTable != None:
-                mineFPTree(conditionalHeadPointTable, newPrefix, frequentPatterns, minSupport, sumset)
+                mineFPTree(conditionalHeadPointTable, newPrefix, frequentPatterns, minSupport, numset)
 
 def getPrefixPath(headPointTable, headPointItem):
     prefixPath = {}
@@ -126,37 +135,50 @@ def removeStr(set, str):
 def getRules(frequentset,currentset, rules, frequentPatterns, minConf):
     for frequentElem in currentset:
         subSet = removeStr(currentset, frequentElem)
-        confidence = frequentPatterns[frequentset]/frequentPatterns[subSet]
-        # print confidence
+        confidence = float(frequentPatterns[frequentset]) / float(frequentPatterns[subSet])
         if (confidence >= minConf):
             flag = False
             for rule in rules:
                 if(rule[0] == subSet and rule[1] == frequentset - subSet):
                     flag = True
             if(flag == False):
-                rules.append((subSet, frequentset - subSet, frequentPatterns[frequentset], confidence))
+                rules.append((subSet, frequentset - subSet, confidence))
 
             if(len(subSet) >= 2):
                 getRules(frequentset, subSet, rules, frequentPatterns, minConf)
 
-if __name__=='__main__':
+def run(df,ms,mc):
     print("fptree:")
-    dataSet = loadDataSet()
-    numset = len(dataSet)
-    print numset
-    frozenDataSet = transfer2FrozenDataSet(dataSet)    
-    minSupport = 0.5
-    fptree, headPointTable = createFPTree(frozenDataSet, minSupport, numset)
-    # fptree.disp()
+    numset,dataSet = loadDataSet(df)
+    frozenDataSet = transfer2FrozenDataSet(dataSet)
+    minSupport = ms
+    fptree, headPointTable = createFPTree(frozenDataSet, minSupport,numset)
     frequentPatterns = {}
     prefix = set([])
-    mineFPTree(headPointTable, prefix, frequentPatterns, minSupport, numset)
+    mineFPTree(headPointTable, prefix, frequentPatterns, minSupport,numset)
+
     print("frequent patterns:")
-    for (k,v) in  frequentPatterns.items():
-        print '频繁序列', k, '次数', v, '概率', float(v)/float(numset)
-    minConf = 0.6
+    frequent_set = []
+    print len(frequentPatterns)
+    if len(list(frequentPatterns)) > 0:
+        for (k,v) in  frequentPatterns.items():
+            item = {'itemName': list(k), 'itemNum': v, 'itemVal': float(v)/float(numset)}
+            frequent_set.append(item)
+
+    minConf = mc
     rules = []
     rulesGenerator(frequentPatterns, minConf, rules)
     print("association rules:")
-    for k in  rules:
-        print k[0], '推断出', k[1], '次数', k[2] ,'概率', k[3]    
+    print len(rules)
+    big_rules = []
+    if len(list(rules)) > 0:
+        for k in  rules:
+            item = {'itemName': list(k[0]), 'itemVal': list(k[1]), 'itemPercent': k[2]}
+            big_rules.append(item)
+
+    report_data = {}
+    result1 = pd.io.json.dumps(frequent_set).decode('utf-8')
+    report_data.update({'frequent_set': json.loads(result1)})
+    result2 = pd.io.json.dumps(big_rules).decode('utf-8')
+    report_data.update({'big_rules': json.loads(result2)})
+    return report_data
