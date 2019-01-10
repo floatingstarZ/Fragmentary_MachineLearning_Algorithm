@@ -3,7 +3,8 @@ import pandas as pd
 import numpy as np
 from datetime import date
 from sklearn.ensemble import RandomForestRegressor
-from xgboost import XGBRegressor,plot_importance
+from xgboost import XGBRegressor
+from xgboost import plot_importance
 import xgboost as xgb
 from sklearn import cross_validation, metrics
 from pandas import Series, DataFrame
@@ -111,7 +112,7 @@ def view_filter(train):
     plt.close()
 
 
-def modelfit(alg, data, labels_, cols, useTrainCV=True, cv_folds=7, early_stopping_rounds=50):
+def modelfit(alg, data, labels_, cols, target, useTrainCV=True, cv_folds=7, early_stopping_rounds=50):
     # 可以返回n_estimates的最佳数目，为什么呢, 哪里返回？
     if useTrainCV:
         xgb_param = alg.get_xgb_params()
@@ -153,14 +154,21 @@ def modelfit(alg, data, labels_, cols, useTrainCV=True, cv_folds=7, early_stoppi
     # feat_imp.plot(kind='bar', title='Feature Importances')
     # plt.ylabel('Feature Importance Score')
     fig, ax = plt.subplots(1, 1, figsize=(8, 13))    
-    plot_importance(alg, max_num_features=20, height=0.5, ax=ax)
+    plot_importance(alg, max_num_features=25, height=0.5, ax=ax)
     plt.show()
-    # 重要性排序
-    feat_sel = list(feat_imp[feat_imp.values > 100].index)
+    # 重要性筛选
+    feat_sel = list(feat_imp.index)
+    feat_val = list(feat_imp.values)
     featur = []
     for i in range(len(feat_sel)):
-        featur.append(cols[int(feat_sel[i][1:])])
-    return featur
+        featur.append([cols[int(feat_sel[i][1:])],feat_val[i]])
+    print('所有特征的score:\n',featur)
+
+    feat_sel2 = list(feat_imp[feat_imp.values > target].index)    
+    featur2 = []
+    for i in range(len(feat_sel2)):
+        featur2.append(cols[int(feat_sel2[i][1:])])    
+    return featur2
     
 def MAE_(xgb1,train_x,train_y):
     y_pre = xgb1.predict(train_x)
@@ -169,39 +177,56 @@ def MAE_(xgb1,train_x,train_y):
         num += np.abs(y_pre[i] - train_y[i])
     print((num*4799+6))
 
-def xgboost_train(data_, labels_, cols):  
-    # print(data_.hea说d(),labels_.head())  
-    # # 特征选择------------------------------------------------------------------
-    # xgb1 = XGBRegressor(learning_rate =0.1,max_depth=5,min_child_weight=1,n_estimators=1000,
-    #                 gamma=0,subsample=0.8,colsample_bytree=0.8,objective= 'reg:logistic',
-    #                     nthread=4,scale_pos_weight=1,seed=27)   
-    # feature_ = modelfit(xgb1, data_.values,labels_.values,cols) # 特征选择
-    # print(feature_)
-    # # 结果------------------------------------------------------------------
+def xgboost_select_feature(data_, labels_,cols,target):# # 特征选择
+    xgb1 = XGBRegressor(learning_rate =0.1,max_depth=5,min_child_weight=1,n_estimators=1000,
+                    gamma=0,subsample=0.8,colsample_bytree=0.8,objective= 'reg:logistic',
+                        nthread=4,scale_pos_weight=1,seed=27)       
+    feature_ = list(modelfit(xgb1, data_.values,labels_.values,cols,target)) # 特征选择    
+    return feature_
+    # [['potential', 533], ['age', 475], ['best_pos', 400], ['reactions', 153], ['club', 148], ['long_passing', 136], ['BMI', 134],
+    #  ['vision', 125], ['heading_accuracy', 121], ['st', 119], ['nationality', 117], ['stamina', 117], ['cf', 116], ['aggression', 116], 
+    #  ['free_kick_accuracy', 114], ['pas', 108], ['finishing', 108], ['crossing', 107], ['phy', 104], ['marking', 101], ['cb', 99], 
+    #  ['sho', 99], ['jumping', 98], ['cdm', 95], ['sprint_speed', 93], ['rw', 92], ['league', 92], ['gk_positioning', 91], ['def', 84], 
+    #  ['shot_power', 83], ['long_shots', 83], ['standing_tackle', 82], ['volleys', 81], ['ball_control', 79], ['dribbling', 78], 
+    #  ['strength', 78], ['short_passing', 77], ['balance', 76], ['positioning', 75], ['penalties', 74], ['dri', 73], ['cm', 71],
+    #   ['agility', 70], ['gk_handling', 69], ['rb', 69], ['acceleration', 68], ['gk_reflexes', 64], ['sliding_tackle', 63], ['curve', 63], 
+    #   ['cam', 59], ['gk_diving', 58], ['interceptions', 57], ['gk_kicking', 56], ['pac', 56], ['weight_kg', 54], ['height_cm', 54], 
+    #   ['international_reputation', 47], ['lw', 38], ['gk', 29], ['weak_foot', 20], ['work_rate_def_', 16], ['work_rate_att_', 16], 
+    #   ['lb', 15], ['skill_moves', 12], ['preferred_foot', 7]]
+    # -------select_feature
+    # ['potential', 'age', 'best_pos', 'reactions', 'club', 'long_passing', 'BMI', 'vision', 'heading_accuracy', 'st', 'nationality', 'stamina', 
+    # 'cf', 'aggression', 'free_kick_accuracy', 'pas', 'finishing', 'crossing', 'phy', 'marking']
     # Model Report
     # r2_score : 0.986
-    # MAE:  20.587096283760808
-    # # 特征选择------------------------------------------------------------------
-    feature_ = ['potential', 'age', 'best_pos', 'reactions', 'club', 'long_passing', 'BMI', 'vision', 'heading_accuracy', 'st', 'nationality', 'stamina', 'cf', 'aggression', 'free_kick_accuracy', 'pas', 'finishing', 'crossing', 'phy', 'marking']
-    train_x = data_[feature_]    
-    train_y = labels_.values    
-    # # 半手动调参----------------------------------------------------------------------------------------------
+    # MAE:  20.587096283760808    
+def xgboost_train(train_x, train_y):    
+    # # 半手动调参-------------------是个过程------调参成功需要注释掉----------------------------------------------------
     # param_test1 = {
-    #           'max_depth':[18,19,20]
+    #           'subsample':[i/100 for i in range(75,100,5)],
+    #           'colsample_bytree':[j/100 for j in range(75,100,5)],
     # }
-    # gsearch1 = GridSearchCV(estimator = XGBRegressor(learning_rate=0.1, n_estimators=366,min_child_weight=1,subsample=0.85,colsample_bytree=0.8,
-    #                    gamma=0,objective= 'reg:logistic', nthread=4, scale_pos_weight=1, seed=27), 
+    # gsearch1 = GridSearchCV(estimator = XGBRegressor(learning_rate=0.1, n_estimators=366, max_depth=24, min_child_weight=1, subsample=0.95,colsample_bytree=0.9,
+    #                    gamma=0,objective= 'reg:logistic', nthread=4, seed=27), 
     #                 param_grid = param_test1,scoring='neg_median_absolute_error',n_jobs=4, iid=False, cv=5)
     # gsearch1.fit(train_x,train_y)
     # print(gsearch1.best_params_,gsearch1.best_score_)
-    # # 半手动调参---结果太差了-------------------------------------------------------------------------------------------
-    # {'max_depth': 19, 'min_child_weight': 1} -0.000962098801735801
-    # 虽然是负数，最后的mae还是可以的23.55
+    # 半手动调参---结果太差了-------------------------------------------------------------------------------------------
+    # 20个特征,mae=19
+    # {'max_depth': 19} -0.000962098801735801
+    # {'max_depth': 20} -0.0009953797204438424    
+    # {'max_depth': 24} -0.0009504750202941337
+    # 15个特征
+    # {'max_depth': 25} -0.0010135409208229943    
+    # 24个特征
+    # {'max_depth': 18} -0.0009839476411412358
+    # 22个特征 结果不如19，mae=20
+    # {'max_depth': 23} -0.0009574992929236896    
+
     train_x = train_x.as_matrix()
-    xgb1 = XGBRegressor(learning_rate=0.1, n_estimators=366, max_depth=19, min_child_weight=1,subsample=0.85,colsample_bytree=0.8,
-                       gamma=0,objective= 'reg:logistic', nthread=4, scale_pos_weight=1, seed=27)
+    xgb1 = XGBRegressor(learning_rate=0.1, n_estimators=366, max_depth=24, min_child_weight=1, subsample=0.95,colsample_bytree=0.9,
+                       gamma=0,objective= 'reg:logistic', nthread=4, seed=27)
     xgb1.fit(train_x,train_y)
-    MAE_(xgb1,train_x,train_y)
+    # MAE_(xgb1,train_x,train_y)
     return xgb1
 
 if __name__ == '__main__':
@@ -219,19 +244,25 @@ if __name__ == '__main__':
 
     # 为了方便分片，调整列的顺序 
     cols = train.columns.values.tolist()
-    cols.insert(train.shape[0]-1,cols.pop(cols.index('yy'))) # 将标签列放在末尾
-    print(train.shape[1])
-    print(test.shape[1])
-
-    # xgboost_train(train.iloc[:,:train.shape[1]-1], train.iloc[:,train.shape[1]-1:],cols)
-
-    xgb_ = XGBRegressor()
-    xgb_ = xgboost_train(train.iloc[:,:train.shape[1]-1], train.iloc[:,train.shape[1]-1:],cols)
+    cols.insert(train.shape[0]-1,cols.pop(cols.index('yy'))) # 将标签列放在末尾    
     
-    feature_ = ['potential', 'age', 'best_pos', 'reactions', 'club', 'long_passing', 'BMI', 'vision', 'heading_accuracy', 'st', 'nationality', 'stamina', 'cf', 'aggression', 'free_kick_accuracy', 'pas', 'finishing', 'crossing', 'phy', 'marking']
+    # -------select_feature
+    # feature_ = xgboost_select_feature(train.iloc[:,:train.shape[1]-1], train.iloc[:,train.shape[1]-1:],cols,100)
+    feature_ = ['potential', 'age', 'best_pos', 'reactions', 'club', 'long_passing', 'BMI', 'vision', 'heading_accuracy', 'st', 'nationality', 'stamina', 'cf', 'aggression', 'free_kick_accuracy', 'pas', 'finishing', 'crossing', 'phy', 'marking','yy']
+    # print(feature_)    
+
+    # 调参
+    # xgboost_train(train.iloc[:,:train.shape[1]-1], train.iloc[:,train.shape[1]-1:])
+
+    # # # train-------------------
+    train = train[feature_]    
+    # print(train.iloc[:,train.shape[1]-1:])
+    xgb_ = XGBRegressor()
+    xgb_ = xgboost_train(train.iloc[:,:train.shape[1]-1], train.iloc[:,train.shape[1]-1:])
+    # predict-------------------
+    feature_.pop()
     test = test[feature_]
-    test = test.as_matrix()    
-    # print(test.head())
+    test = test.as_matrix()        
     test_pre = xgb_.predict(test)
     test_pre_ = pd.DataFrame(test_pre).apply(lambda x: (maxx - minn)*x + minn)
     result_(test_pre_)
