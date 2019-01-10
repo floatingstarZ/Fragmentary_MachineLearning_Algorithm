@@ -156,7 +156,7 @@ def modelfit(alg, data, labels_, cols, useTrainCV=True, cv_folds=7, early_stoppi
     plot_importance(alg, max_num_features=20, height=0.5, ax=ax)
     plt.show()
     # 重要性排序
-    feat_sel = list(feat_imp[feat_imp.values > 18].index)
+    feat_sel = list(feat_imp[feat_imp.values > 100].index)
     featur = []
     for i in range(len(feat_sel)):
         featur.append(cols[int(feat_sel[i][1:])])
@@ -175,7 +175,6 @@ def xgboost_train(data_, labels_, cols):
     # xgb1 = XGBRegressor(learning_rate =0.1,max_depth=5,min_child_weight=1,n_estimators=1000,
     #                 gamma=0,subsample=0.8,colsample_bytree=0.8,objective= 'reg:logistic',
     #                     nthread=4,scale_pos_weight=1,seed=27)   
-    # modelfit(xgb1, data_.values,labels_.values,cols)
     # feature_ = modelfit(xgb1, data_.values,labels_.values,cols) # 特征选择
     # print(feature_)
     # # 结果------------------------------------------------------------------
