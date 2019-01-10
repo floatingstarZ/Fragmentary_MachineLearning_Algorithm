@@ -5,3 +5,5 @@
 
 
 包括：Kmeans聚类
+
+xgboost详解： https://blog.csdn.net/ACBattle/article/details/86218163
