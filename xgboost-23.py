@@ -171,11 +171,12 @@ def modelfit(alg, data, labels_, cols, target, useTrainCV=True, cv_folds=7, earl
     return featur2
     
 def MAE_(xgb1,train_x,train_y):
-    y_pre = xgb1.predict(train_x)
+    y_pre = list(xgb1.predict(train_x))
+    train_y = train_y.as_matrix()    
     num = 0
-    for i in range(len(y_pre)):
+    for i in range(len(y_pre)):        
         num += np.abs(y_pre[i] - train_y[i])
-    print((num*4799+6))
+    print((num*4799+6)/len(y_pre))
 
 def xgboost_select_feature(data_, labels_,cols,target):# # 特征选择
     xgb1 = XGBRegressor(learning_rate =0.1,max_depth=5,min_child_weight=1,n_estimators=1000,
@@ -226,7 +227,7 @@ def xgboost_train(train_x, train_y):
     xgb1 = XGBRegressor(learning_rate=0.1, n_estimators=366, max_depth=24, min_child_weight=1, subsample=0.95,colsample_bytree=0.9,
                        gamma=0,objective= 'reg:logistic', nthread=4, seed=27)
     xgb1.fit(train_x,train_y)
-    # MAE_(xgb1,train_x,train_y)
+    MAE_(xgb1,train_x,train_y)
     return xgb1
 
 if __name__ == '__main__':
